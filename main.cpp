@@ -82,7 +82,7 @@ int main() {
 	glUseProgram(shaderProgram);
 
 	GLuint colorLoc = glGetUniformLocation(shaderProgram, "u_color");
-	glUniform3f(colorLoc, 1.0f, 0.0f, 0.0f);
+	//glUniform3f(colorLoc, 1.0f, 0.0f, 0.0f);
 
 	// initialize MVP
 	GLuint modelTransformLoc = glGetUniformLocation(shaderProgram, "u_model");
@@ -106,7 +106,7 @@ int main() {
 	glfwSetCursorPos(window, 1024 / 2, 768 / 2);
 
 	// Setup White Background
-	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+	glClearColor(0.9f, 0.9f, 0.9f, 0.0f);
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -131,9 +131,9 @@ int main() {
 
 		//Adjust Bullet Position, Size, & Color
 		trans = glm::mat4(1.0f); // identity
-		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
+		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, -3.0f));
 		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
-		glUniform3f(colorLoc, 0.0f, 0.0f, 0.0f);
+		glUniform3f(colorLoc, 0.2f, 0.2f, 0.2f);
 		
 		//Send to shader
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
