@@ -89,11 +89,7 @@ int main() {
 	glUseProgram(shaderProgram);
 
 	GLuint colorLoc = glGetUniformLocation(shaderProgram, "u_color");
-<<<<<<< Updated upstream
-	glUniform3f(colorLoc, 1.0f, 0.0f, 0.0f);
-=======
 	glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
->>>>>>> Stashed changes
 
 	// initialize MVP
 	GLuint modelTransformLoc = glGetUniformLocation(shaderProgram, "u_model");
@@ -117,11 +113,7 @@ int main() {
 	glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
 
 	// Setup White Background
-<<<<<<< Updated upstream
-	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
-=======
 	glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
->>>>>>> Stashed changes
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -181,13 +173,13 @@ int main() {
 		glBindVertexArray(bullet.vaoId);
 
 		trans = glm::mat4(1.0f); // identity
-<<<<<<< Updated upstream
+
 		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
 		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
 		glUniform3f(colorLoc, 0.0f, 0.0f, 0.0f);
 		
 		//Send to shader
-=======
+
 		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 1.0f));
 		trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
 
@@ -195,8 +187,6 @@ int main() {
 		GLuint bulletTexture = bullet.textures[bullet.materials[0].diffuse_texname];
 		glBindTexture(GL_TEXTURE_2D, bulletTexture);
 
-
->>>>>>> Stashed changes
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 		glDrawElements(GL_TRIANGLES, bullet.numFaces, GL_UNSIGNED_INT, (void*)0);
 
