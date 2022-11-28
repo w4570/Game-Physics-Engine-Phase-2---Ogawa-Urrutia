@@ -87,6 +87,7 @@ void computeMatricesFromInputs() {
 	// Move forward
 	if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
 		position += direction * deltaTime * speed;
+		printf("Up");
 	}
 	// Move backward
 	if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
