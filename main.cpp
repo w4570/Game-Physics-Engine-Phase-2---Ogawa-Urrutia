@@ -30,6 +30,8 @@
 using namespace glm;
 
 GLFWwindow* window;
+const unsigned int SCR_WIDTH = 1280;
+const unsigned int SCR_HEIGHT = 720;
 
 int main() {
 
@@ -51,7 +53,7 @@ int main() {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	// Open a window and create its OpenGL context
-	window = glfwCreateWindow(1200, 800, "Physics Engine Phase 2 (Ogawa & Urrutia)", NULL, NULL);
+	window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Physics Engine Phase 2 (Ogawa & Urrutia)", NULL, NULL);
 	if (window == NULL) {
 		fprintf(stderr, "Failed to load window! \n");
 		return -1;
@@ -72,7 +74,12 @@ int main() {
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
 	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 0.0f };
-	LoadObjToMemory(&bullet, 1.0f, bulletOffsets);
+	LoadObjToMemory(&bullet, 0.1f, bulletOffsets);
+
+	ObjData box;
+	LoadObjFile(&box, "Box.obj");
+	GLfloat boxOffsets[] = { 0.0f, 0.0f, 0.0f };
+	LoadObjToMemory(&box, 0.2f, boxOffsets);
 
 #pragma endregion
 
@@ -82,7 +89,11 @@ int main() {
 	glUseProgram(shaderProgram);
 
 	GLuint colorLoc = glGetUniformLocation(shaderProgram, "u_color");
+<<<<<<< Updated upstream
 	glUniform3f(colorLoc, 1.0f, 0.0f, 0.0f);
+=======
+	glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
+>>>>>>> Stashed changes
 
 	// initialize MVP
 	GLuint modelTransformLoc = glGetUniformLocation(shaderProgram, "u_model");
@@ -103,10 +114,14 @@ int main() {
 
 	// Set the mouse at the center of the screen
 	glfwPollEvents();
-	glfwSetCursorPos(window, 1024 / 2, 768 / 2);
+	glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
 
 	// Setup White Background
+<<<<<<< Updated upstream
 	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+=======
+	glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
+>>>>>>> Stashed changes
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -119,26 +134,86 @@ int main() {
 
 	while (!glfwWindowShouldClose(window)) {
 
+#pragma region Viewport
+		float ratio;
+		int width, height;
+
+		glfwGetFramebufferSize(window, &width, &height);
+		ratio = width / (float)height;
+
+		glViewport(0, 0, width, height);
+#pragma endregion
+
+#pragma region Projection
+		// Orthopgraphic projection but make units same as pixels. origin is lower left of window
+		// projection = glm::ortho(0.0f, (GLfloat)width, 0.0f, (GLfloat)height, 0.1f, 10.0f); // when using this scale objects really high at pixel unity size
+
+		// Orthographic with stretching
+		//projection = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 10.0f);
+
+		// Orthographic with corection for stretching, resize window to see difference with previous example
+		//projection = glm::ortho(-ratio, ratio, -1.0f, 1.0f, 0.1f, 10.0f);
+
+		// Perspective Projection
+		projection = glm::perspective(glm::radians(90.0f), ratio, 0.1f, 10.0f),
+
+			// Set projection matrix in shader
+			glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+#pragma endregion
+
+#pragma region View
+		glm::mat4 view = glm::lookAt(
+			glm::vec3(0.5f, 0.0f, -1.0f),
+			glm::vec3(trans[3][0], trans[3][1], trans[3][2]),
+			glm::vec3(0.0f, 1.0f, 0.0f)
+		);
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+#pragma endregion
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		//toggle to render wit GL_FILL or GL_LINE
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 #pragma region Draw
 
 		//Drawing the Bullet
 		glBindVertexArray(bullet.vaoId);
 
-		//Adjust Bullet Position, Size, & Color
 		trans = glm::mat4(1.0f); // identity
+<<<<<<< Updated upstream
 		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
 		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
 		glUniform3f(colorLoc, 0.0f, 0.0f, 0.0f);
 		
 		//Send to shader
-		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+=======
+		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 1.0f));
+		trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
 
-		glDrawElements(GL_TRIANGLES, bullet.numFaces, GL_UNSIGNED_INT,(void*)0);
+		glActiveTexture(GL_TEXTURE0);
+		GLuint bulletTexture = bullet.textures[bullet.materials[0].diffuse_texname];
+		glBindTexture(GL_TEXTURE_2D, bulletTexture);
+
+
+>>>>>>> Stashed changes
+		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+		glDrawElements(GL_TRIANGLES, bullet.numFaces, GL_UNSIGNED_INT, (void*)0);
+
+		////Drawing the Box
+		glBindVertexArray(box.vaoId);
+
+		trans = glm::mat4(1.0f); // identity
+		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
+		trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
+
+		glActiveTexture(GL_TEXTURE0);
+		GLuint boxTexture = box.textures[box.materials[0].diffuse_texname];
+		glBindTexture(GL_TEXTURE_2D, boxTexture);
+			
+		//Send to shader
+		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+		glDrawElements(GL_TRIANGLES, box.numFaces, GL_UNSIGNED_INT,(void*)0);
 
 #pragma endregion
 
