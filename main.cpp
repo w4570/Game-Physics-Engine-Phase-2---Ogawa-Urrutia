@@ -33,8 +33,7 @@ using namespace glm;
 
 struct Particle {
 	glm::vec3 pos, speed, size;
-	float life;
-	float angle, drag;
+	float life, angle, drag, radius;
 	float cameradistance; // *Squared* distance to the camera. if dead : -1.0f
 
 	bool operator<(const Particle& that) const {
@@ -52,11 +51,15 @@ const unsigned int SCR_HEIGHT = 720;
 const int MaxParticles = 10;
 Particle ParticlesContainer[MaxParticles];
 int LastUsedParticle = 0;
+float particleSize = 0.1f;
 glm::vec3 bulletOrigin = glm::vec3(-8.0f, 0.0f, 0.0f);
 float xForce = 0.0f, yForce = 0.0f, gravity = 0.0f;
 bool renderParticle = false;
 
-glm::vec3 cameraPosition = glm::vec3(-11.5f, 2.5f, 7.4f);	// Initial Camera Position
+float boxSize = 0.3f, boxMass = 10.0f;
+glm::vec3 boxPosition = glm::vec3(0.0f, 0.0f, 0.0f);
+
+glm::vec3 cameraPosition = glm::vec3(-12.5f, 2.5f, 7.4f);	// Initial Camera Position
 float horizontalAngle = 2.32f;								// Initial vertical angle
 float verticalAngle = -0.26f;								// Initial vertical angle
 float initialFoV = 45.0f;									// Initial Field of View
@@ -159,12 +162,12 @@ int main() {
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
 	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 0.0f };
-	LoadObjToMemory(&bullet, 0.1f, bulletOffsets);
+	LoadObjToMemory(&bullet, particleSize, bulletOffsets);
 
 	ObjData box;
 	LoadObjFile(&box, "Box.obj");
 	GLfloat boxOffsets[] = { 0.0f, 0.0f, 0.0f };
-	LoadObjToMemory(&box, 0.3f, boxOffsets);
+	LoadObjToMemory(&box, boxSize, boxOffsets);
 
 #pragma endregion
 
@@ -334,33 +337,17 @@ int main() {
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 		glDrawElements(GL_TRIANGLES, bullet.numFaces, GL_UNSIGNED_INT, (void*)0);
 
-		//Drawing the First Box
+		//Drawing the Box
 		glBindVertexArray(box.vaoId);
 
 		trans = glm::mat4(1.0f); // identity
-		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
+		trans = glm::translate(trans, boxPosition);
 		trans = glm::rotate(trans, glm::radians(270.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
 
 		glActiveTexture(GL_TEXTURE0);
 		GLuint boxTextureA = box.textures[box.materials[0].diffuse_texname];
 		glBindTexture(GL_TEXTURE_2D, boxTextureA);
-
-		//Send to shader
-		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-		glDrawElements(GL_TRIANGLES, box.numFaces, GL_UNSIGNED_INT, (void*)0);
-
-		//Drawing the Second Box
-		glBindVertexArray(box.vaoId);
-
-		trans = glm::mat4(1.0f); // identity
-		trans = glm::translate(trans, glm::vec3(4.0f, 0.0f, 0.0f));
-		trans = glm::rotate(trans, glm::radians(270.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
-
-		glActiveTexture(GL_TEXTURE0);
-		GLuint boxTextureB = box.textures[box.materials[0].diffuse_texname];
-		glBindTexture(GL_TEXTURE_2D, boxTextureB);
 
 		//Send to shader
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
@@ -384,6 +371,7 @@ int main() {
 			ParticlesContainer[particleIndex].drag = gravity;
 			ParticlesContainer[particleIndex].life = 10.0f;
 			ParticlesContainer[particleIndex].pos = bulletOrigin;
+			ParticlesContainer[particleIndex].radius = particleSize / 2.0f;
 
 		}
 		else if (state == GLFW_RELEASE)
@@ -398,7 +386,11 @@ int main() {
 
 			Particle& p = ParticlesContainer[i]; // shortcut
 
-			if (p.life > 0.0f) 
+			if (getDistance(ParticlesContainer[i].pos.x, boxPosition.x, ParticlesContainer[i].pos.y, boxPosition.y, ParticlesContainer[i].pos.z, boxPosition.z) <= ParticlesContainer[i].radius + (boxSize/2) ) {
+				printf("Collision");
+				p.cameradistance = -1.0f;
+			}
+			else if (p.life > 0.0f) 
 			{
 				// Decrease life
 				p.life -= deltaTime;
@@ -416,11 +408,12 @@ int main() {
 					g_particule_position_size_data[4 * ParticlesCount + 1] = p.pos.y;
 					g_particule_position_size_data[4 * ParticlesCount + 2] = p.pos.z;
 				}
-			}
-			else 
-			{
-				p.cameradistance = -1.0f;
-			}
+				else
+				{
+					p.cameradistance = -1.0f;
+				}
+				ParticlesCount++;
+			}	
 		}
 
 #pragma endregion
