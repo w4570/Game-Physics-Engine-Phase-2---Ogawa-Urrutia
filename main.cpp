@@ -32,9 +32,9 @@ using namespace glm;
 //-------------------- STRUCTURE --------------------\\
 
 struct Particle {
-	glm::vec3 pos, speed;
+	glm::vec3 pos, speed, size;
 	float life;
-	float size, angle, weight;
+	float angle, drag;
 	float cameradistance; // *Squared* distance to the camera. if dead : -1.0f
 
 	bool operator<(const Particle& that) const {
@@ -54,6 +54,7 @@ Particle ParticlesContainer[MaxParticles];
 int LastUsedParticle = 0;
 glm::vec3 bulletOrigin = glm::vec3(-8.0f, 0.0f, 0.0f);
 float xForce = 0.0f, yForce = 0.0f, gravity = 0.0f;
+bool renderParticle = false;
 
 glm::vec3 cameraPosition = glm::vec3(-11.5f, 2.5f, 7.4f);	// Initial Camera Position
 float horizontalAngle = 2.32f;								// Initial vertical angle
@@ -313,6 +314,8 @@ int main() {
 		//toggle to render wit GL_FILL or GL_LINE
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
+		glfwSetKeyCallback(window, key_callback);
+
 #pragma region Draw
 
 		//Drawing the Bullet
@@ -360,6 +363,34 @@ int main() {
 		//Send to shader
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 		glDrawElements(GL_TRIANGLES, box.numFaces, GL_UNSIGNED_INT, (void*)0);
+
+#pragma endregion
+
+#pragma region Particle
+
+		int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+		if (state == GLFW_PRESS && renderParticle == false)
+		{
+			renderParticle = true;
+
+			int particleIndex = FindUnusedParticle();
+
+			glm::vec3 maindir = glm::vec3(xForce, yForce, 0.0f);
+			ParticlesContainer[particleIndex].speed = maindir;
+
+			ParticlesContainer[particleIndex].size = glm::vec3(1.0f, 1.0f, 1.0f);
+			ParticlesContainer[particleIndex].drag = gravity;
+			ParticlesContainer[particleIndex].life = 10.0f;
+			ParticlesContainer[particleIndex].pos = bulletOrigin;
+
+		}
+		else if (state == GLFW_RELEASE)
+		{
+			renderParticle = false;
+		}
+
+		int ParticlesCount = 0;
+		Particle* newParticle = NULL;
 
 #pragma endregion
 
