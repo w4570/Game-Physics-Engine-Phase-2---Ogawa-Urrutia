@@ -145,7 +145,6 @@
     <None Include="Shaders\vertex.shader" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="camera_control.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
