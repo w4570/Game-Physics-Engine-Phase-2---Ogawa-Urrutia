@@ -50,13 +50,14 @@ const unsigned int SCR_HEIGHT = 720;
 const int MaxParticles = 10;
 Particle ParticlesContainer[MaxParticles];
 int LastUsedParticle = 0;
+glm::vec3 bulletOrigin = glm::vec3(-8.0f, 0.0f, 0.0f);
 
-glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);	// Initial Camera Position
-float horizontalAngle = 3.14f;				// Initial vertical angle : Z axis (3.14)
-float verticalAngle = 0.0f;					// Initial vertical angle : none
-float initialFoV = 45.0f;					// Initial Field of View
-float speed = 3.0f;							// Camera Movement Speed (3 units / second)
-float mouseSpeed = 0.005f;					// Camera Rotation Speed
+glm::vec3 cameraPosition = glm::vec3(-11.5f, 2.5f, 7.4f);	// Initial Camera Position
+float horizontalAngle = 2.32f;								// Initial vertical angle
+float verticalAngle = -0.26f;								// Initial vertical angle
+float initialFoV = 45.0f;									// Initial Field of View
+float speed = 3.0f;											// Camera Movement Speed (3 units / second)
+float mouseSpeed = 0.005f;									// Camera Rotation Speed
 
 //-------------------- FUNCTIONS --------------------\\
 
@@ -127,13 +128,13 @@ int main() {
 
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
-	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 5.0f };
+	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 0.0f };
 	LoadObjToMemory(&bullet, 0.1f, bulletOffsets);
 
 	ObjData box;
 	LoadObjFile(&box, "Box.obj");
-	GLfloat boxOffsets[] = { 3.0f, 0.0f, 0.0f };
-	LoadObjToMemory(&box, 0.2f, boxOffsets);
+	GLfloat boxOffsets[] = { 0.0f, 0.0f, 0.0f };
+	LoadObjToMemory(&box, 0.3f, boxOffsets);
 
 #pragma endregion
 
@@ -242,19 +243,19 @@ int main() {
 
 		// Move forward
 		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-			position += direction * deltaTime * speed;
+			cameraPosition += direction * deltaTime * speed;
 		}
 		// Move backward
 		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-			position -= direction * deltaTime * speed;
+			cameraPosition -= direction * deltaTime * speed;
 		}
 		// Strafe right
 		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-			position += right * deltaTime * speed;
+			cameraPosition += right * deltaTime * speed;
 		}
 		// Strafe left
 		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-			position -= right * deltaTime * speed;
+			cameraPosition -= right * deltaTime * speed;
 		}
 
 		float FoV = initialFoV;// - 5 * glfwGetMouseWheel(); // Now GLFW 3 requires setting up a callback for this. It's a bit too complicated for this beginner's tutorial, so it's disabled instead.
@@ -264,8 +265,8 @@ int main() {
 
 		// Camera matrix
 		glm::mat4 view = glm::lookAt(
-			position,           // Camera is here
-			position + direction, // and looks here : at the same position, plus "direction"
+			cameraPosition,           // Camera is here
+			cameraPosition + direction, // and looks here : at the same position, plus "direction"
 			up                  // Head is up (set to 0,-1,0 to look upside-down)
 		);
 
@@ -290,8 +291,8 @@ int main() {
 		//Drawing the Bullet
 		glBindVertexArray(bullet.vaoId);
 
-		trans = glm::mat4(1.0f); // identit
-		trans = glm::translate(trans, glm::vec3(2.0f, 0.0f, 0.0f));
+		trans = glm::mat4(1.0f); // identity
+		trans = glm::translate(trans, bulletOrigin);
 		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
 
 		glActiveTexture(GL_TEXTURE0);
@@ -301,16 +302,33 @@ int main() {
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 		glDrawElements(GL_TRIANGLES, bullet.numFaces, GL_UNSIGNED_INT, (void*)0);
 
-		////Drawing the Box
+		//Drawing the First Box
 		glBindVertexArray(box.vaoId);
 
 		trans = glm::mat4(1.0f); // identity
 		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
-		trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
+		trans = glm::rotate(trans, glm::radians(270.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
 
 		glActiveTexture(GL_TEXTURE0);
-		GLuint boxTexture = box.textures[box.materials[0].diffuse_texname];
-		glBindTexture(GL_TEXTURE_2D, boxTexture);
+		GLuint boxTextureA = box.textures[box.materials[0].diffuse_texname];
+		glBindTexture(GL_TEXTURE_2D, boxTextureA);
+
+		//Send to shader
+		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+		glDrawElements(GL_TRIANGLES, box.numFaces, GL_UNSIGNED_INT, (void*)0);
+
+		//Drawing the Second Box
+		glBindVertexArray(box.vaoId);
+
+		trans = glm::mat4(1.0f); // identity
+		trans = glm::translate(trans, glm::vec3(4.0f, 0.0f, 0.0f));
+		trans = glm::rotate(trans, glm::radians(270.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
+
+		glActiveTexture(GL_TEXTURE0);
+		GLuint boxTextureB = box.textures[box.materials[0].diffuse_texname];
+		glBindTexture(GL_TEXTURE_2D, boxTextureB);
 
 		//Send to shader
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
