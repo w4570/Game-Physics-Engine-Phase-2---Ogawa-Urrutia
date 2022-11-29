@@ -51,7 +51,7 @@ const int MaxParticles = 10;
 Particle ParticlesContainer[MaxParticles];
 int LastUsedParticle = 0;
 
-glm::vec3 position = glm::vec3(0, 0, 5);	// Initial Camera Position
+glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);	// Initial Camera Position
 float horizontalAngle = 3.14f;				// Initial vertical angle : Z axis (3.14)
 float verticalAngle = 0.0f;					// Initial vertical angle : none
 float initialFoV = 45.0f;					// Initial Field of View
@@ -127,12 +127,12 @@ int main() {
 
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
-	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 0.0f };
+	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 5.0f };
 	LoadObjToMemory(&bullet, 0.1f, bulletOffsets);
 
 	ObjData box;
 	LoadObjFile(&box, "Box.obj");
-	GLfloat boxOffsets[] = { 0.0f, 0.0f, 0.0f };
+	GLfloat boxOffsets[] = { 3.0f, 0.0f, 0.0f };
 	LoadObjToMemory(&box, 0.2f, boxOffsets);
 
 #pragma endregion
@@ -164,7 +164,6 @@ int main() {
 
 	// Get mouse position
 	double xpos, ypos;
-	glfwGetCursorPos(window, &xpos, &ypos);
 
 	// Set the mouse at the center of the screen
 	glfwPollEvents();
@@ -186,12 +185,13 @@ int main() {
 	static double prevTime = glfwGetTime();
 
 	// Compute time difference between current and last frame
-	double currentTime = glfwGetTime();
-	float deltaTime = float(currentTime - prevTime);
+	double currentTime;
+	float deltaTime;
 
-	while (!glfwWindowShouldClose(window)) {
+	while (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS && glfwWindowShouldClose(window) == 0) {
 
 #pragma region Viewport
+
 		float ratio;
 		int width, height;
 
@@ -202,17 +202,13 @@ int main() {
 
 #pragma endregion
 
-#pragma region Projection
+#pragma region Camera
 
-		// Perspective Projection
-		projection = glm::perspective(glm::radians(90.0f), ratio, 0.1f, 10.0f),
+		currentTime = glfwGetTime();
+		deltaTime = float(currentTime - prevTime);
 
-			// Set projection matrix in shader
-			glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-#pragma endregion
-
-#pragma region View
+		glfwGetCursorPos(window, &xpos, &ypos);
+		glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
 
 		// Compute new orientation
 		horizontalAngle += mouseSpeed * float(SCR_WIDTH / 2 - xpos);
@@ -227,11 +223,59 @@ int main() {
 			verticalAngle = -0.8f;
 		}
 
-		glm::mat4 view = glm::lookAt(
-			glm::vec3(0.5f, 0.0f, -1.0f),
-			glm::vec3(trans[3][0], trans[3][1], trans[3][2]),
-			glm::vec3(0.0f, 1.0f, 0.0f)
+		// Direction : Spherical coordinates to Cartesian coordinates conversion
+		glm::vec3 direction(
+			cos(verticalAngle) * sin(horizontalAngle),
+			sin(verticalAngle),
+			cos(verticalAngle) * cos(horizontalAngle)
 		);
+
+		// Right vector
+		glm::vec3 right = glm::vec3(
+			sin(horizontalAngle - 3.14f / 2.0f),
+			0,
+			cos(horizontalAngle - 3.14f / 2.0f)
+		);
+
+		// Up vector
+		glm::vec3 up = glm::cross(right, direction);
+
+		// Move forward
+		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+			position += direction * deltaTime * speed;
+		}
+		// Move backward
+		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+			position -= direction * deltaTime * speed;
+		}
+		// Strafe right
+		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+			position += right * deltaTime * speed;
+		}
+		// Strafe left
+		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+			position -= right * deltaTime * speed;
+		}
+
+		float FoV = initialFoV;// - 5 * glfwGetMouseWheel(); // Now GLFW 3 requires setting up a callback for this. It's a bit too complicated for this beginner's tutorial, so it's disabled instead.
+
+		// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
+		glm::mat4 projection = glm::perspective(glm::radians(FoV), 4.0f / 3.0f, 0.1f, 100.0f);
+
+		// Camera matrix
+		glm::mat4 view = glm::lookAt(
+			position,           // Camera is here
+			position + direction, // and looks here : at the same position, plus "direction"
+			up                  // Head is up (set to 0,-1,0 to look upside-down)
+		);
+
+		// For the next frame, the "last time" will be "now"
+		prevTime = currentTime;
+
+		printf("%f / %f \n", horizontalAngle, verticalAngle);
+
+		// Set projection matrix in shader
+		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
 #pragma endregion
@@ -247,8 +291,8 @@ int main() {
 		glBindVertexArray(bullet.vaoId);
 
 		trans = glm::mat4(1.0f); // identit
-		trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 1.0f));
-		trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
+		trans = glm::translate(trans, glm::vec3(2.0f, 0.0f, 0.0f));
+		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
 
 		glActiveTexture(GL_TEXTURE0);
 		GLuint bulletTexture = bullet.textures[bullet.materials[0].diffuse_texname];
