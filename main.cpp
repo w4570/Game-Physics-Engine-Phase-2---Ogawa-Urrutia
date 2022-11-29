@@ -127,12 +127,12 @@ int main() {
 
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
-	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 0.0f };
+	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 5.0f };
 	LoadObjToMemory(&bullet, 0.1f, bulletOffsets);
 
 	ObjData box;
 	LoadObjFile(&box, "Box.obj");
-	GLfloat boxOffsets[] = { 0.0f, 0.0f, 0.0f };
+	GLfloat boxOffsets[] = { 3.0f, 0.0f, 0.0f };
 	LoadObjToMemory(&box, 0.2f, boxOffsets);
 
 #pragma endregion
@@ -188,7 +188,7 @@ int main() {
 	double currentTime;
 	float deltaTime;
 
-	while (!glfwWindowShouldClose(window)) {
+	while (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS && glfwWindowShouldClose(window) == 0) {
 
 #pragma region Viewport
 
@@ -202,22 +202,13 @@ int main() {
 
 #pragma endregion
 
-#pragma region Projection
-
-		// Perspective Projection
-		projection = glm::perspective(glm::radians(90.0f), ratio, 0.1f, 10.0f),
-
-		// Set projection matrix in shader
-		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-#pragma endregion
-
-#pragma region View
+#pragma region Camera
 
 		currentTime = glfwGetTime();
 		deltaTime = float(currentTime - prevTime);
 
 		glfwGetCursorPos(window, &xpos, &ypos);
+		glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
 
 		// Compute new orientation
 		horizontalAngle += mouseSpeed * float(SCR_WIDTH / 2 - xpos);
@@ -269,9 +260,10 @@ int main() {
 		float FoV = initialFoV;// - 5 * glfwGetMouseWheel(); // Now GLFW 3 requires setting up a callback for this. It's a bit too complicated for this beginner's tutorial, so it's disabled instead.
 
 		// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
-		glm::perspective(glm::radians(FoV), 4.0f / 3.0f, 0.1f, 100.0f);
+		glm::mat4 projection = glm::perspective(glm::radians(FoV), 4.0f / 3.0f, 0.1f, 100.0f);
+		
 		// Camera matrix
-		glm::lookAt(
+		glm::mat4 view = glm::lookAt(
 			position,           // Camera is here
 			position + direction, // and looks here : at the same position, plus "direction"
 			up                  // Head is up (set to 0,-1,0 to look upside-down)
@@ -280,7 +272,11 @@ int main() {
 		// For the next frame, the "last time" will be "now"
 		prevTime = currentTime;
 
-		printf("%f / %f / %f \n", position.x, position.y, position.z);
+		printf("%f / %f \n", horizontalAngle, verticalAngle);
+
+		// Set projection matrix in shader
+		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
 #pragma endregion
 
@@ -295,7 +291,7 @@ int main() {
 		glBindVertexArray(bullet.vaoId);
 
 		trans = glm::mat4(1.0f); // identit
-		trans = glm::translate(trans, glm::vec3(-3.0f, 0.0f, 0.0f));
+		trans = glm::translate(trans, glm::vec3(2.0f, 0.0f, 0.0f));
 		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
 
 		glActiveTexture(GL_TEXTURE0);
