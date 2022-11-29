@@ -29,9 +29,11 @@ Julian Urrutia
 #include <glm/gtx/norm.hpp>
 using namespace glm;
 
+//-------------------- STRUCTURE --------------------\\
+
 struct Particle {
 	glm::vec3 pos, speed;
-	int life;
+	float life;
 	float size, angle, weight;
 	float cameradistance; // *Squared* distance to the camera. if dead : -1.0f
 
@@ -51,6 +53,7 @@ const int MaxParticles = 10;
 Particle ParticlesContainer[MaxParticles];
 int LastUsedParticle = 0;
 glm::vec3 bulletOrigin = glm::vec3(-8.0f, 0.0f, 0.0f);
+float xForce = 0.0f, yForce = 0.0f, gravity = 0.0f;
 
 glm::vec3 cameraPosition = glm::vec3(-11.5f, 2.5f, 7.4f);	// Initial Camera Position
 float horizontalAngle = 2.32f;								// Initial vertical angle
@@ -86,6 +89,32 @@ int FindUnusedParticle() {
 
 void SortParticles() {
 	std::sort(&ParticlesContainer[0], &ParticlesContainer[MaxParticles]);
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	// switch case for changing projectile type
+	switch (key) {
+		//normal heavy projectile
+	case '1':    // Weak Bullet, Gravity Disabled
+		xForce = 5.0f;
+		yForce = 0.0f;
+		gravity = 0.0f;
+		break;
+	case '2': // Strong Bullet, Gravity Disabled
+		xForce = 12.0f;
+		yForce = 0.0f;
+		gravity = 0.0f;
+		break;
+	case '3': // Cannon Bullet, Gravity Enabled
+		xForce = 8.0f;
+		yForce = 4.0f;
+		gravity = 9.8f;
+		break;
+	default:
+		printf("Invalid Input");
+		break;
+	}
 }
 
 int main() {
@@ -272,8 +301,6 @@ int main() {
 
 		// For the next frame, the "last time" will be "now"
 		prevTime = currentTime;
-
-		printf("%f / %f \n", horizontalAngle, verticalAngle);
 
 		// Set projection matrix in shader
 		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
