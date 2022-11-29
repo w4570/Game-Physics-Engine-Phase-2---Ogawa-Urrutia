@@ -59,6 +59,8 @@ float initialFoV = 45.0f;									// Initial Field of View
 float speed = 3.0f;											// Camera Movement Speed (3 units / second)
 float mouseSpeed = 0.005f;									// Camera Rotation Speed
 
+bool mousePressed = false;
+
 //-------------------- FUNCTIONS --------------------\\
 
 float getDistance(float X_POS_1, float Y_POS_1, float Z_POS_1, float X_POS_2, float Y_POS_2, float Z_POS_2) {
@@ -86,6 +88,14 @@ int FindUnusedParticle() {
 
 void SortParticles() {
 	std::sort(&ParticlesContainer[0], &ParticlesContainer[MaxParticles]);
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+		mousePressed = true;
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+		mousePressed = false;
 }
 
 int main() {
@@ -169,6 +179,12 @@ int main() {
 	// Set the mouse at the center of the screen
 	glfwPollEvents();
 	glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
+
+	//Disable cursor visibility
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	//mouse input detector
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
 	// Setup White Background
 	glClearColor(0.9f, 0.9f, 0.9f, 0.0f);
@@ -301,6 +317,23 @@ int main() {
 
 		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 		glDrawElements(GL_TRIANGLES, bullet.numFaces, GL_UNSIGNED_INT, (void*)0);
+
+		//Draw bullet on mouse click
+		/*if (mousePressed == true)
+		{
+			glBindVertexArray(bullet.vaoId);
+
+			trans = glm::mat4(1.0f);
+			trans = glm::translate(trans, glm::vec3(-8.0f + deltaTime, 1.0f, 1.0f));
+			trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
+
+			glActiveTexture(GL_TEXTURE0);
+			GLuint bulletTexture = bullet.textures[bullet.materials[0].diffuse_texname];
+			glBindTexture(GL_TEXTURE_2D, bulletTexture);
+
+			glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+			glDrawElements(GL_TRIANGLES, bullet.numFaces, GL_UNSIGNED_INT, (void*)0);
+		}*/
 
 		//Drawing the First Box
 		glBindVertexArray(box.vaoId);
