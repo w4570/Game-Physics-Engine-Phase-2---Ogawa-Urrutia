@@ -190,6 +190,8 @@ int main() {
 
 #pragma endregion
 
+	static GLfloat* g_particule_position_size_data = new GLfloat[MaxParticles * 4];
+
 	// Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
@@ -391,6 +393,35 @@ int main() {
 
 		int ParticlesCount = 0;
 		Particle* newParticle = NULL;
+
+		for (int i = 0; i < MaxParticles; i++) {
+
+			Particle& p = ParticlesContainer[i]; // shortcut
+
+			if (p.life > 0.0f) 
+			{
+				// Decrease life
+				p.life -= deltaTime;
+				if (p.life > 0.0f) {
+
+					p.speed += glm::vec3(0.0f, p.drag, 0.0f) * (float)deltaTime * 0.5f;
+
+					// Simulate simple physics : gravity only, no collisions
+					p.pos += p.speed * (float)deltaTime;
+					p.cameradistance = glm::length2(p.pos - cameraPosition);
+					//ParticlesContainer[i].pos += glm::vec3(0.0f,10.0f, 0.0f) * (float)delta;
+
+					// Fill the GPU buffer
+					g_particule_position_size_data[4 * ParticlesCount + 0] = p.pos.x;
+					g_particule_position_size_data[4 * ParticlesCount + 1] = p.pos.y;
+					g_particule_position_size_data[4 * ParticlesCount + 2] = p.pos.z;
+				}
+			}
+			else 
+			{
+				p.cameradistance = -1.0f;
+			}
+		}
 
 #pragma endregion
 
