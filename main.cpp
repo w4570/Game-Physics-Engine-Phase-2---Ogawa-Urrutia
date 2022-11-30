@@ -155,10 +155,8 @@ int main() {
 
 #pragma region Mesh Loading
 
-	float xDisplacement = 0.0f;	 	 // Value used to store and manage box current position due to bullet collision reaction
-
 	float boxSize = 0.3f, boxMass = 10.0f;
-	glm::vec3 boxPosition = glm::vec3(xDisplacement, 0.0f, 0.0f);
+	glm::vec3 boxPosition = glm::vec3(0.0f, 0.0f, 0.0f);
 
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
@@ -276,6 +274,8 @@ int main() {
 	// Initialize with empty (NULL) buffer : it will be updated later, each frame.
 	glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLubyte), NULL, GL_STREAM_DRAW);
 
+	float xDisplacement = 0.0f;
+
 	while (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS && glfwWindowShouldClose(window) == 0) {
 
 #pragma region Viewport
@@ -332,9 +332,9 @@ int main() {
 		glBindVertexArray(box.vaoId);
 
 		trans = glm::mat4(1.0f); // identity
-		trans = glm::translate(trans, boxPosition);
 		trans = glm::rotate(trans, glm::radians(270.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
+		trans = glm::translate(trans, boxPosition);
 
 		glActiveTexture(GL_TEXTURE0);
 		GLuint boxTextureA = box.textures[box.materials[0].diffuse_texname];
