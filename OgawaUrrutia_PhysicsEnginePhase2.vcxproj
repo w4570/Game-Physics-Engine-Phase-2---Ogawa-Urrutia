@@ -149,6 +149,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Headers\camera_control.h" />
+<<<<<<< Updated upstream
+=======
+    <ClInclude Include="Headers\control.h" />
+>>>>>>> Stashed changes
     <ClInclude Include="Headers\obj_mesh.h" />
     <ClInclude Include="Headers\shader.h" />
     <ClInclude Include="Headers\stb_image.h" />

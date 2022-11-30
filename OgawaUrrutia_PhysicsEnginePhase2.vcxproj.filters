@@ -42,6 +42,9 @@
     <ClInclude Include="Headers\obj_mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Headers\camera_control.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
