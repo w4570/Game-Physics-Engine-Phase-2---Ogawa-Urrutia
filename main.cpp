@@ -36,7 +36,7 @@ using namespace glm;
 struct Particle {
 	glm::vec3 pos, speed;
 	unsigned char r, g, b, a; // Color
-	float size, angle, drag;
+	float size, angle, drag, mass;
 	float life; // Remaining life of the particle. if <0 : dead and unused.
 	float cameradistance; // *Squared* distance to the camera. if dead : -1.0f
 
@@ -57,8 +57,11 @@ Particle ParticlesContainer[MaxParticles];
 int LastUsedParticle = 0;
 float particleSize = 0.1f;
 glm::vec3 bulletOrigin = glm::vec3(-8.0f, 0.0f, 0.0f);
-float xForce = 0.0f, yForce = 0.0f, gravity = 0.0f;
+float xForce = 0.0f, yForce = 0.0f, gravity = 0.0f, mass = 0.0f;
 bool renderParticle = false;
+
+float boxSize = 0.5f, boxMass = 20.0f;
+glm::vec3 boxPosition = glm::vec3(0.0f, 0.0f, 0.0f);
 
 //-------------------- FUNCTIONS --------------------\\
 
@@ -100,16 +103,19 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		xForce = 5.0f;
 		yForce = 0.0f;
 		gravity = 0.0f;
+		mass = 5.0f;
 		break;
 	case '2': // Strong Bullet, Gravity Disabled
 		xForce = 12.0f;
 		yForce = 0.0f;
 		gravity = 0.0f;
+		mass = 10.0f;
 		break;
 	case '3': // Cannon Bullet, Gravity Enabled
 		xForce = 8.0f;
 		yForce = 4.0f;
 		gravity = -9.8f;
+		mass = 5.0f;
 		break;
 	default:
 		printf("Invalid Input");
@@ -155,9 +161,6 @@ int main() {
 
 #pragma region Mesh Loading
 
-	float boxSize = 0.3f, boxMass = 10.0f;
-	glm::vec3 boxPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
 	GLfloat bulletOffsets[] = { 0.0f, 0.0f, 0.0f };
@@ -186,8 +189,11 @@ int main() {
 	GLuint viewLoc = glGetUniformLocation(objectShaderProgram, "u_view");
 	GLuint projectionLoc = glGetUniformLocation(objectShaderProgram, "u_projection");
 
-	glm::mat4 trans = glm::mat4(1.0f); // identity
+	glm::mat4 trans = glm::mat4(1.0f); // Bullet Trans Identity
 	glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+
+	glm::mat4 bxTrans = glm::mat4(1.0f); // Box Trans Identity
+	glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(bxTrans));
 
 	// define projection matrix
 	glm::mat4 projection = glm::mat4(1.0f);
@@ -201,6 +207,9 @@ int main() {
 	GLuint TextureID = glGetUniformLocation(shaderProgram, "myTextureSampler");
 
 #pragma endregion
+
+	// Setup White Background
+	glClearColor(0.9f, 0.9f, 0.9f, 0.0f);
 
 	for (int i = 0; i < MaxParticles; i++) {
 		ParticlesContainer[i].life = -1.0f;
@@ -216,9 +225,6 @@ int main() {
 	// Set the mouse at the center of the screen
 	glfwPollEvents();
 	glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
-
-	// Setup White Background
-	glClearColor(0.9f, 0.9f, 0.9f, 0.0f);
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -274,7 +280,8 @@ int main() {
 	// Initialize with empty (NULL) buffer : it will be updated later, each frame.
 	glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLubyte), NULL, GL_STREAM_DRAW);
 
-	float xDisplacement = 0.0f;
+	float xDisplacement = 0.0f;		// Stores net force to be applied to box when moving
+	float finalSpot = 0.0f;			// Stores the expected final x position of the box after collision
 
 	while (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS && glfwWindowShouldClose(window) == 0) {
 
@@ -331,17 +338,17 @@ int main() {
 		//Drawing the Box
 		glBindVertexArray(box.vaoId);
 
-		trans = glm::mat4(1.0f); // identity
-		trans = glm::rotate(trans, glm::radians(270.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		trans = glm::scale(trans, glm::vec3(1.0f, 1.0f, 1.0f));
-		trans = glm::translate(trans, boxPosition);
+		bxTrans = glm::mat4(1.0f); // identity
+		bxTrans = glm::rotate(bxTrans, glm::radians(270.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		bxTrans = glm::scale(bxTrans, glm::vec3(1.0f, 1.0f, 1.0f));
+		bxTrans = glm::translate(bxTrans, boxPosition);
 
 		glActiveTexture(GL_TEXTURE0);
 		GLuint boxTextureA = box.textures[box.materials[0].diffuse_texname];
 		glBindTexture(GL_TEXTURE_2D, boxTextureA);
 
 		//Send to shader
-		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+		glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(bxTrans));
 		glDrawElements(GL_TRIANGLES, box.numFaces, GL_UNSIGNED_INT, (void*)0);
 
 #pragma endregion
@@ -369,6 +376,7 @@ int main() {
 			ParticlesContainer[particleIndex].size = particleSize;
 			ParticlesContainer[particleIndex].drag = gravity;
 			ParticlesContainer[particleIndex].life = 10.0f;
+			ParticlesContainer[particleIndex].mass = mass;
 			//ParticlesContainer[particleIndex].pos = bulletOrigin;
 
 		}
@@ -395,6 +403,9 @@ int main() {
 					printf("Collision\n");
 					p.life = -1.0f;
 					p.pos = bulletOrigin;
+
+					xDisplacement = (p.mass * p.speed.x) / boxMass;	// Newton's Second Law Of Motion: Calculating Net Force on box with mass. 
+					finalSpot = xDisplacement;
 				}
 
 				if (p.life > 0.0f) {
@@ -428,6 +439,20 @@ int main() {
 			}	
 		}
 
+		boxPosition.x = boxPosition.x + (xDisplacement * deltaTime);
+		bxTrans = glm::translate(bxTrans, glm::vec3(boxPosition.x, 0.0f, 0.0f) * deltaTime);
+
+		if (xDisplacement > 0)
+		{
+			xDisplacement = xDisplacement - (finalSpot * deltaTime);
+		}
+		else
+		{
+			xDisplacement = 0.0f;
+		}
+
+		printf("X Position: %f // %f %f || X Displacement = %f\n", boxPosition.x, boxPosition.y, boxPosition.z, xDisplacement);
+
 #pragma endregion
 
 		// Update the buffers that OpenGL uses for rendering.
@@ -448,6 +473,7 @@ int main() {
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		// Use our shader
+		glUseProgram(objectShaderProgram);
 		glUseProgram(shaderProgram);
 
 		// Bind our texture in Texture Unit 0
@@ -530,6 +556,7 @@ int main() {
 	glDeleteBuffers(1, &particles_position_buffer);
 	glDeleteBuffers(1, &billboard_vertex_buffer);
 	glDeleteProgram(shaderProgram);
+	glDeleteProgram(objectShaderProgram);
 	glDeleteTextures(1, &Texture);
 	glDeleteVertexArrays(1, &VertexArrayID);
 
