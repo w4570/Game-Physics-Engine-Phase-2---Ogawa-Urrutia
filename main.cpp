@@ -60,15 +60,14 @@ glm::vec3 bulletOrigin = glm::vec3(-8.0f, 0.0f, 0.0f);
 float xForce = 0.0f, yForce = 0.0f, gravity = 0.0f;
 bool renderParticle = false;
 
-float boxSize = 0.3f, boxMass = 10.0f;
-glm::vec3 boxPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-
 //-------------------- FUNCTIONS --------------------\\
 
 float getDistance(float X_POS_1, float Y_POS_1, float Z_POS_1, float X_POS_2, float Y_POS_2, float Z_POS_2) {
 	return sqrt(pow(X_POS_2 - X_POS_1, 2) + pow(Y_POS_2 - Y_POS_1, 2) + pow(Z_POS_2 - Z_POS_1, 2));
 };
 
+// Finds a Particle in ParticlesContainer which isn't used yet.
+// (i.e. life < 0);
 int FindUnusedParticle() {
 
 	for (int i = LastUsedParticle; i < MaxParticles; i++) {
@@ -110,7 +109,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	case '3': // Cannon Bullet, Gravity Enabled
 		xForce = 8.0f;
 		yForce = 4.0f;
-		gravity = 9.8f;
+		gravity = -9.8f;
 		break;
 	default:
 		printf("Invalid Input");
@@ -155,6 +154,11 @@ int main() {
 #pragma endregion
 
 #pragma region Mesh Loading
+
+	float xDisplacement = 0.0f;	 	 // Value used to store and manage box current position due to bullet collision reaction
+
+	float boxSize = 0.3f, boxMass = 10.0f;
+	glm::vec3 boxPosition = glm::vec3(xDisplacement, 0.0f, 0.0f);
 
 	ObjData bullet;
 	LoadObjFile(&bullet, "Sphere.obj");
@@ -240,6 +244,7 @@ int main() {
 	for (int i = 0; i < MaxParticles; i++) {
 		ParticlesContainer[i].life = -1.0f;
 		ParticlesContainer[i].cameradistance = -1.0f;
+		ParticlesContainer[i].pos = bulletOrigin;
 	}
 
 	GLuint Texture = loadDDS("particle.DDS");
@@ -346,6 +351,7 @@ int main() {
 		int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
 		if (state == GLFW_PRESS && renderParticle == false)
 		{
+
 			renderParticle = true;
 
 			int particleIndex = FindUnusedParticle();
@@ -363,7 +369,7 @@ int main() {
 			ParticlesContainer[particleIndex].size = particleSize;
 			ParticlesContainer[particleIndex].drag = gravity;
 			ParticlesContainer[particleIndex].life = 10.0f;
-			ParticlesContainer[particleIndex].pos = bulletOrigin;
+			//ParticlesContainer[particleIndex].pos = bulletOrigin;
 
 		}
 		else if (state == GLFW_RELEASE)
@@ -374,17 +380,23 @@ int main() {
 		int ParticlesCount = 0;
 		Particle* newParticle = NULL;
 
+		glfwSetKeyCallback(window, key_callback);
+
 		for (int i = 0; i < MaxParticles; i++) {
 
 			Particle& p = ParticlesContainer[i]; // shortcut
 
-			/*if (getDistance(ParticlesContainer[i].pos.x, boxPosition.x, ParticlesContainer[i].pos.y, boxPosition.y, ParticlesContainer[i].pos.z, boxPosition.z) <= (ParticlesContainer[i].size/2) + (boxSize/2) ) {
-				p.cameradistance = -1.0f;
-			}
-			else*/ if (p.life > 0.0f) 
+			if (p.life > 0.0f) 
 			{
 				// Decrease life
 				p.life -= deltaTime;
+
+				if (getDistance(p.pos.x, boxPosition.x, p.pos.y, boxPosition.y, p.pos.z, boxPosition.z) <= (p.size / 2) + (boxSize / 2)) {
+					printf("Collision\n");
+					p.life = -1.0f;
+					p.pos = bulletOrigin;
+				}
+
 				if (p.life > 0.0f) {
 
 					p.speed += glm::vec3(0.0f, p.drag, 0.0f) * (float)deltaTime * 0.5f;
@@ -405,16 +417,26 @@ int main() {
 					g_particule_color_data[4 * ParticlesCount + 1] = p.g;
 					g_particule_color_data[4 * ParticlesCount + 2] = p.b;
 					g_particule_color_data[4 * ParticlesCount + 3] = p.a;
+
 				}
-				else
-				{
+				else {
+					// Particles that just died will be put at the end of the buffer in SortParticles();
 					p.cameradistance = -1.0f;
 				}
+
 				ParticlesCount++;
 			}	
 		}
 
 #pragma endregion
+
+		printf("%d ", ParticlesCount);
+
+		// Update the buffers that OpenGL uses for rendering.
+		// There are much more sophisticated means to stream data from the CPU to the GPU, 
+		// but this is outside the scope of this tutorial.
+		// http://www.opengl.org/wiki/Buffer_Object_Streaming
+
 
 		glBindBuffer(GL_ARRAY_BUFFER, particles_position_buffer);
 		glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLfloat), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
@@ -423,7 +445,6 @@ int main() {
 		glBindBuffer(GL_ARRAY_BUFFER, particles_color_buffer);
 		glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLubyte), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
 		glBufferSubData(GL_ARRAY_BUFFER, 0, ParticlesCount * sizeof(GLubyte) * 4, g_particule_color_data);
-
 
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
