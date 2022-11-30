@@ -430,8 +430,6 @@ int main() {
 
 #pragma endregion
 
-		printf("%d ", ParticlesCount);
-
 		// Update the buffers that OpenGL uses for rendering.
 		// There are much more sophisticated means to stream data from the CPU to the GPU, 
 		// but this is outside the scope of this tutorial.

@@ -106,6 +106,4 @@ void computeMatricesFromInputs() {
 	// For the next frame, the "last time" will be "now"
 	lastTime = currentTime;
 
-	printf("%f / %f / %f \n", cameraPosition.x, cameraPosition.y, cameraPosition.z);
-
 }
