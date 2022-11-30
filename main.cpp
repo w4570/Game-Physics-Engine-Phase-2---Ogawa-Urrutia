@@ -22,8 +22,9 @@ Julian Urrutia
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "Headers\tiny_obj_loader.h"
 #include "Headers\obj_mesh.h";
+#include "Headers\control.h"
 #include "Headers\shader.h"
-#include "Headers\camera_control.h"
+#include "Headers\texture.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/norm.hpp>
@@ -31,9 +32,12 @@ using namespace glm;
 
 //-------------------- STRUCTURE --------------------\\
 
+// CPU representation of a particle
 struct Particle {
-	glm::vec3 pos, speed, size;
-	float life, angle, drag, radius;
+	glm::vec3 pos, speed;
+	unsigned char r, g, b, a; // Color
+	float size, angle, drag;
+	float life; // Remaining life of the particle. if <0 : dead and unused.
 	float cameradistance; // *Squared* distance to the camera. if dead : -1.0f
 
 	bool operator<(const Particle& that) const {
@@ -58,13 +62,6 @@ bool renderParticle = false;
 
 float boxSize = 0.3f, boxMass = 10.0f;
 glm::vec3 boxPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-
-glm::vec3 cameraPosition = glm::vec3(-12.5f, 2.5f, 7.4f);	// Initial Camera Position
-float horizontalAngle = 2.32f;								// Initial vertical angle
-float verticalAngle = -0.26f;								// Initial vertical angle
-float initialFoV = 45.0f;									// Initial Field of View
-float speed = 3.0f;											// Camera Movement Speed (3 units / second)
-float mouseSpeed = 0.005f;									// Camera Rotation Speed
 
 //-------------------- FUNCTIONS --------------------\\
 
@@ -176,24 +173,37 @@ int main() {
 	GLuint shaderProgram = LoadShaders("Shaders/vertex.shader", "Shaders/fragment.shader");
 	glUseProgram(shaderProgram);
 
-	GLuint colorLoc = glGetUniformLocation(shaderProgram, "u_color");
+	GLuint objectShaderProgram = LoadShaders("Shaders/objectVertex.shader", "Shaders/objectFragment.shader");
+	glUseProgram(objectShaderProgram);
+
+	GLuint colorLoc = glGetUniformLocation(objectShaderProgram, "u_color");
 	//glUniform3f(colorLoc, 1.0f, 0.0f, 0.0f);
 
 	// initialize MVP
-	GLuint modelTransformLoc = glGetUniformLocation(shaderProgram, "u_model");
-	GLuint viewLoc = glGetUniformLocation(shaderProgram, "u_view");
-	GLuint projectionLoc = glGetUniformLocation(shaderProgram, "u_projection");
+	GLuint modelTransformLoc = glGetUniformLocation(objectShaderProgram, "u_model");
+	GLuint viewLoc = glGetUniformLocation(objectShaderProgram, "u_view");
+	GLuint projectionLoc = glGetUniformLocation(objectShaderProgram, "u_projection");
 
 	glm::mat4 trans = glm::mat4(1.0f); // identity
 	glUniformMatrix4fv(modelTransformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
 	// define projection matrix
 	glm::mat4 projection = glm::mat4(1.0f);
-	//glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+	// Vertex shader
+	GLuint CameraRight_worldspace_ID = glGetUniformLocation(shaderProgram, "CameraRight_worldspace");
+	GLuint CameraUp_worldspace_ID = glGetUniformLocation(shaderProgram, "CameraUp_worldspace");
+	GLuint ViewProjMatrixID = glGetUniformLocation(shaderProgram, "VP");
+
+	// fragment shader
+	GLuint TextureID = glGetUniformLocation(shaderProgram, "myTextureSampler");
 
 #pragma endregion
 
-	static GLfloat* g_particule_position_size_data = new GLfloat[MaxParticles * 4];
+	for (int i = 0; i < MaxParticles; i++) {
+		ParticlesContainer[i].life = -1.0f;
+		ParticlesContainer[i].cameradistance = -1.0f;
+	}
 
 	// Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
@@ -224,6 +234,43 @@ int main() {
 	double currentTime;
 	float deltaTime;
 
+	static GLfloat* g_particule_position_size_data = new GLfloat[MaxParticles * 4];
+	static GLubyte* g_particule_color_data = new GLubyte[MaxParticles * 4];
+
+	for (int i = 0; i < MaxParticles; i++) {
+		ParticlesContainer[i].life = -1.0f;
+		ParticlesContainer[i].cameradistance = -1.0f;
+	}
+
+	GLuint Texture = loadDDS("particle.DDS");
+
+	// The VBO containing the 4 vertices of the particles.
+	// Thanks to instancing, they will be shared by all particles.
+	static const GLfloat g_vertex_buffer_data[] = {
+		 -0.5f, -0.5f, 0.0f,
+		  0.5f, -0.5f, 0.0f,
+		 -0.5f,  0.5f, 0.0f,
+		  0.5f,  0.5f, 0.0f,
+	};
+	GLuint billboard_vertex_buffer;
+	glGenBuffers(1, &billboard_vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, billboard_vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+
+	// The VBO containing the positions and sizes of the particles
+	GLuint particles_position_buffer;
+	glGenBuffers(1, &particles_position_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, particles_position_buffer);
+	// Initialize with empty (NULL) buffer : it will be updated later, each frame.
+	glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLfloat), NULL, GL_STREAM_DRAW);
+
+	// The VBO containing the colors of the particles
+	GLuint particles_color_buffer;
+	glGenBuffers(1, &particles_color_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, particles_color_buffer);
+	// Initialize with empty (NULL) buffer : it will be updated later, each frame.
+	glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLubyte), NULL, GL_STREAM_DRAW);
+
 	while (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS && glfwWindowShouldClose(window) == 0) {
 
 #pragma region Viewport
@@ -242,75 +289,14 @@ int main() {
 
 		currentTime = glfwGetTime();
 		deltaTime = float(currentTime - prevTime);
-
-		glfwGetCursorPos(window, &xpos, &ypos);
-		glfwSetCursorPos(window, SCR_WIDTH / 2, SCR_HEIGHT / 2);
-
-		// Compute new orientation
-		horizontalAngle += mouseSpeed * float(SCR_WIDTH / 2 - xpos);
-		verticalAngle += mouseSpeed * float(SCR_HEIGHT / 2 - ypos);
-
-		// Restriction Camera Angle Vertical
-		if (verticalAngle > 0.8f) {
-			verticalAngle = 0.8f;
-		}
-
-		if (verticalAngle < -0.8f) {
-			verticalAngle = -0.8f;
-		}
-
-		// Direction : Spherical coordinates to Cartesian coordinates conversion
-		glm::vec3 direction(
-			cos(verticalAngle) * sin(horizontalAngle),
-			sin(verticalAngle),
-			cos(verticalAngle) * cos(horizontalAngle)
-		);
-
-		// Right vector
-		glm::vec3 right = glm::vec3(
-			sin(horizontalAngle - 3.14f / 2.0f),
-			0,
-			cos(horizontalAngle - 3.14f / 2.0f)
-		);
-
-		// Up vector
-		glm::vec3 up = glm::cross(right, direction);
-
-		// Move forward
-		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-			cameraPosition += direction * deltaTime * speed;
-		}
-		// Move backward
-		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-			cameraPosition -= direction * deltaTime * speed;
-		}
-		// Strafe right
-		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-			cameraPosition += right * deltaTime * speed;
-		}
-		// Strafe left
-		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-			cameraPosition -= right * deltaTime * speed;
-		}
-
-		float FoV = initialFoV;// - 5 * glfwGetMouseWheel(); // Now GLFW 3 requires setting up a callback for this. It's a bit too complicated for this beginner's tutorial, so it's disabled instead.
-
-		// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
-		glm::mat4 projection = glm::perspective(glm::radians(FoV), 4.0f / 3.0f, 0.1f, 100.0f);
-
-		// Camera matrix
-		glm::mat4 view = glm::lookAt(
-			cameraPosition,           // Camera is here
-			cameraPosition + direction, // and looks here : at the same position, plus "direction"
-			up                  // Head is up (set to 0,-1,0 to look upside-down)
-		);
-
-		// For the next frame, the "last time" will be "now"
 		prevTime = currentTime;
 
-		// Set projection matrix in shader
-		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+		computeMatricesFromInputs();
+		glm::mat4 ProjectionMatrix = getProjectionMatrix();
+		glm::mat4 ViewMatrix = getViewMatrix();
+
+		glm::vec3 CameraPosition(glm::inverse(ViewMatrix)[3]);
+		glm::mat4 ViewProjectionMatrix = ProjectionMatrix * ViewMatrix;
 
 #pragma endregion
 
@@ -364,14 +350,20 @@ int main() {
 
 			int particleIndex = FindUnusedParticle();
 
-			glm::vec3 maindir = glm::vec3(xForce, yForce, 0.0f);
-			ParticlesContainer[particleIndex].speed = maindir;
+			float spread = 1.0f;
 
-			ParticlesContainer[particleIndex].size = glm::vec3(1.0f, 1.0f, 1.0f);
+			glm::vec3 maindir = glm::vec3(xForce, yForce, 0.0f);
+			ParticlesContainer[particleIndex].speed = maindir * spread;
+
+			ParticlesContainer[particleIndex].r = 255;
+			ParticlesContainer[particleIndex].g = 0;
+			ParticlesContainer[particleIndex].b = 0;
+			ParticlesContainer[particleIndex].a = 255;
+
+			ParticlesContainer[particleIndex].size = particleSize;
 			ParticlesContainer[particleIndex].drag = gravity;
 			ParticlesContainer[particleIndex].life = 10.0f;
 			ParticlesContainer[particleIndex].pos = bulletOrigin;
-			ParticlesContainer[particleIndex].radius = particleSize / 2.0f;
 
 		}
 		else if (state == GLFW_RELEASE)
@@ -386,11 +378,10 @@ int main() {
 
 			Particle& p = ParticlesContainer[i]; // shortcut
 
-			if (getDistance(ParticlesContainer[i].pos.x, boxPosition.x, ParticlesContainer[i].pos.y, boxPosition.y, ParticlesContainer[i].pos.z, boxPosition.z) <= ParticlesContainer[i].radius + (boxSize/2) ) {
-				printf("Collision");
+			/*if (getDistance(ParticlesContainer[i].pos.x, boxPosition.x, ParticlesContainer[i].pos.y, boxPosition.y, ParticlesContainer[i].pos.z, boxPosition.z) <= (ParticlesContainer[i].size/2) + (boxSize/2) ) {
 				p.cameradistance = -1.0f;
 			}
-			else if (p.life > 0.0f) 
+			else*/ if (p.life > 0.0f) 
 			{
 				// Decrease life
 				p.life -= deltaTime;
@@ -400,13 +391,20 @@ int main() {
 
 					// Simulate simple physics : gravity only, no collisions
 					p.pos += p.speed * (float)deltaTime;
-					p.cameradistance = glm::length2(p.pos - cameraPosition);
+					p.cameradistance = glm::length2(p.pos - CameraPosition);
 					//ParticlesContainer[i].pos += glm::vec3(0.0f,10.0f, 0.0f) * (float)delta;
 
 					// Fill the GPU buffer
 					g_particule_position_size_data[4 * ParticlesCount + 0] = p.pos.x;
 					g_particule_position_size_data[4 * ParticlesCount + 1] = p.pos.y;
 					g_particule_position_size_data[4 * ParticlesCount + 2] = p.pos.z;
+
+					g_particule_position_size_data[4 * ParticlesCount + 3] = p.size;
+
+					g_particule_color_data[4 * ParticlesCount + 0] = p.r;
+					g_particule_color_data[4 * ParticlesCount + 1] = p.g;
+					g_particule_color_data[4 * ParticlesCount + 2] = p.b;
+					g_particule_color_data[4 * ParticlesCount + 3] = p.a;
 				}
 				else
 				{
@@ -418,11 +416,106 @@ int main() {
 
 #pragma endregion
 
+		glBindBuffer(GL_ARRAY_BUFFER, particles_position_buffer);
+		glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLfloat), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
+		glBufferSubData(GL_ARRAY_BUFFER, 0, ParticlesCount * sizeof(GLfloat) * 4, g_particule_position_size_data);
+
+		glBindBuffer(GL_ARRAY_BUFFER, particles_color_buffer);
+		glBufferData(GL_ARRAY_BUFFER, MaxParticles * 4 * sizeof(GLubyte), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
+		glBufferSubData(GL_ARRAY_BUFFER, 0, ParticlesCount * sizeof(GLubyte) * 4, g_particule_color_data);
+
+
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		// Use our shader
+		glUseProgram(shaderProgram);
+
+		// Bind our texture in Texture Unit 0
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, Texture);
+		// Set our "myTextureSampler" sampler to use Texture Unit 0
+		glUniform1i(TextureID, 0);
+
+		// Same as the billboards tutorial
+		glUniform3f(CameraRight_worldspace_ID, ViewMatrix[0][0], ViewMatrix[1][0], ViewMatrix[2][0]);
+		glUniform3f(CameraUp_worldspace_ID, ViewMatrix[0][1], ViewMatrix[1][1], ViewMatrix[2][1]);
+
+		glUniformMatrix4fv(ViewProjMatrixID, 1, GL_FALSE, &ViewProjectionMatrix[0][0]);
+
+		// 1rst attribute buffer : vertices
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, billboard_vertex_buffer);
+		glVertexAttribPointer(
+			0,                  // attribute. No particular reason for 0, but must match the layout in the shader.
+			3,                  // size
+			GL_FLOAT,           // type
+			GL_FALSE,           // normalized?
+			0,                  // stride
+			(void*)0            // array buffer offset
+		);
+
+		// 2nd attribute buffer : positions of particles' centers
+		glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, particles_position_buffer);
+		glVertexAttribPointer(
+			1,                                // attribute. No particular reason for 1, but must match the layout in the shader.
+			4,                                // size : x + y + z + size => 4
+			GL_FLOAT,                         // type
+			GL_FALSE,                         // normalized?
+			0,                                // stride
+			(void*)0                          // array buffer offset
+		);
+
+		// 3rd attribute buffer : particles' colors
+		glEnableVertexAttribArray(2);
+		glBindBuffer(GL_ARRAY_BUFFER, particles_color_buffer);
+		glVertexAttribPointer(
+			2,                                // attribute. No particular reason for 1, but must match the layout in the shader.
+			4,                                // size : r + g + b + a => 4
+			GL_UNSIGNED_BYTE,                 // type
+			GL_TRUE,                          // normalized?    *** YES, this means that the unsigned char[4] will be accessible with a vec4 (floats) in the shader ***
+			0,                                // stride
+			(void*)0                          // array buffer offset
+		);
+
+		// These functions are specific to glDrawArrays*Instanced*.
+		// The first parameter is the attribute buffer we're talking about.
+		// The second parameter is the "rate at which generic vertex attributes advance when rendering multiple instances"
+		// http://www.opengl.org/sdk/docs/man/xhtml/glVertexAttribDivisor.xml
+		glVertexAttribDivisor(0, 0); // particles vertices : always reuse the same 4 vertices -> 0
+		glVertexAttribDivisor(1, 1); // positions : one per quad (its center)                 -> 1
+		glVertexAttribDivisor(2, 1); // color : one per quad                                  -> 1
+
+		// Draw the particules !
+		// This draws many times a small triangle_strip (which looks like a quad).
+		// This is equivalent to :
+		// for(i in ParticlesCount) : glDrawArrays(GL_TRIANGLE_STRIP, 0, 4), 
+		// but faster.
+		glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, ParticlesCount);
+
+		glDisableVertexAttribArray(0);
+		glDisableVertexAttribArray(1);
+		glDisableVertexAttribArray(2);
+
 		glfwSwapBuffers(window);
 		//listen for glfw input events
 		glfwPollEvents();
 
 	}
+
+	delete[] g_particule_position_size_data;
+
+	// Cleanup VBO and shader
+	glDeleteBuffers(1, &particles_color_buffer);
+	glDeleteBuffers(1, &particles_position_buffer);
+	glDeleteBuffers(1, &billboard_vertex_buffer);
+	glDeleteProgram(shaderProgram);
+	glDeleteTextures(1, &Texture);
+	glDeleteVertexArrays(1, &VertexArrayID);
+
+	// Close OpenGL window and terminate GLFW
+	glfwTerminate();
 
 	return 0;
 }

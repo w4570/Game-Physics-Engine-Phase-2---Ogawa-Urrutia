@@ -25,6 +25,8 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="packages.config" />
+    <None Include="Shaders\objectFragment.shader" />
+    <None Include="Shaders\objectVertex.shader" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Headers\shader.h">
@@ -36,14 +38,26 @@
     <ClInclude Include="Headers\tiny_obj_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Headers\camera_control.h">
+    <ClInclude Include="Headers\obj_mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Headers\obj_mesh.h">
+    <ClInclude Include="Headers\texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Headers\control.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="control.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="particle.DDS" />
   </ItemGroup>
 </Project>
