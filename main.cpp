@@ -60,7 +60,7 @@ glm::vec3 bulletOrigin = glm::vec3(-8.0f, 0.0f, 0.0f);
 float xForce = 0.0f, yForce = 0.0f, gravity = 0.0f, mass = 0.0f;
 bool renderParticle = false;
 
-float boxSize = 0.5f, boxMass = 20.0f;
+float boxSize = 0.3f, boxMass = 20.0f;
 glm::vec3 boxPosition = glm::vec3(0.0f, 0.0f, 0.0f);
 
 //-------------------- FUNCTIONS --------------------\\
@@ -310,6 +310,10 @@ int main() {
 		glm::vec3 CameraPosition(glm::inverse(ViewMatrix)[3]);
 		glm::mat4 ViewProjectionMatrix = ProjectionMatrix * ViewMatrix;
 
+		// Set projection matrix in shader
+		//glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(ProjectionMatrix));
+		//glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(ViewMatrix));
+
 #pragma endregion
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -487,6 +491,8 @@ int main() {
 
 		glUniformMatrix4fv(ViewProjMatrixID, 1, GL_FALSE, &ViewProjectionMatrix[0][0]);
 
+
+
 		// 1rst attribute buffer : vertices
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, billboard_vertex_buffer);
@@ -537,6 +543,7 @@ int main() {
 		// for(i in ParticlesCount) : glDrawArrays(GL_TRIANGLE_STRIP, 0, 4), 
 		// but faster.
 		glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, ParticlesCount);
+
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
