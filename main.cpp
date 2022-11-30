@@ -399,8 +399,7 @@ int main() {
 				// Decrease life
 				p.life -= deltaTime;
 
-				if (getDistance(p.pos.x, boxPosition.x, p.pos.y, boxPosition.y, p.pos.z, boxPosition.z) <= (p.size / 2) + (boxSize / 2)) {
-					printf("Collision\n");
+				if (getDistance(p.pos.x, p.pos.y, p.pos.z, boxPosition.x, boxPosition.y, boxPosition.z) <= (p.size / 2.0f) + (boxSize / 2.0f)) {
 					p.life = -1.0f;
 					p.pos = bulletOrigin;
 
